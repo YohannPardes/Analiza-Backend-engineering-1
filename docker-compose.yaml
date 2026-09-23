@@ -1,0 +1,35 @@
+services:
+
+  service-a-container:
+    build:
+      context: .
+      dockerfile: ./ServiceA/Dockerfile
+    container_name: svc-a-cont
+    networks:
+      - my-network
+    ports:
+      - "8081:8080"
+
+  service-b-container:
+    build:
+      context: .
+      dockerfile: ./ServiceB/Dockerfile
+    container_name: svc-b-cont
+    networks:
+      - my-network
+    ports:
+      - "8082:8080"
+
+  service-c-container:
+    build:
+      context: .
+      dockerfile: ./ServiceC/Dockerfile
+    container_name: svc-c-cont
+    networks:
+      - my-network
+    ports:
+      - "8083:8080"
+
+networks:
+  my-network:
+    driver: bridge
