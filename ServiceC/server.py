@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 import connector, API_manager
 
 app = FastAPI()
-api_manager = API_manager.API_manager()
+api_manager = API_manager.APIManager()
 api_manager.api_list = [API_manager.GeoAPIProvider1(), API_manager.GeoAPIProvider2()]
 
 BASE_URL = "http://svc-b-cont:8080"
@@ -24,11 +24,11 @@ async def resolve_ip(ip: str):
         response_dict = await api_manager.get_geo_infos(ip)
     except API_manager.ProviderUnavailable as e:
         raise HTTPException(status_code=503, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Error from geo provider: {str(e)}")
+    except API_manager.InvalidIPError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     # Adding the ip in Services B DB
     return await connector.make_request(
         BASE_URL + "/AddIp", 8, "ServiceB-AddIp", method='POST',
-        json_data=geo_data
+        json_data=response_dict
     )
