@@ -1,7 +1,10 @@
 from fastapi import FastAPI, HTTPException
-import connector
+import connector, API_manager
 
 app = FastAPI()
+api_manager = API_manager.API_manager()
+api_manager.api_list = [API_manager.GeoAPIProvider1(), API_manager.GeoAPIProvider2()]
+
 BASE_URL = "http://svc-b-cont:8080"
 
 @app.get("/")
@@ -16,13 +19,15 @@ async def resolve_ip(ip: str):
     print(f"START: Add IP {ip}")
     ip = connector.validate_ip(ip)
 
-    response_dict = await connector.make_request(
-        f"https://free.freeipapi.com/api/v1/json/{ip}", 4, "FreeIpAPI"
-    )
-    geo_data = connector.free_ip_api_key_picker(response_dict)
-    if geo_data.get("latitude") is None or geo_data.get("longitude") is None:
-        raise HTTPException(status_code=502, detail=f"FreeIpAPI returned no location for {ip}")
-    print(f"free api worked: {geo_data}")
+    # Get geo information from the API manager
+    try: 
+        response_dict = await api_manager.get_geo_infos(ip)
+    except API_manager.ProviderUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Error from geo provider: {str(e)}")
+
+    # Adding the ip in Services B DB
     return await connector.make_request(
         BASE_URL + "/AddIp", 8, "ServiceB-AddIp", method='POST',
         json_data=geo_data

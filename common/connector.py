@@ -35,7 +35,7 @@ async def make_request(url, timeout, service_name, method='GET', json_data=None)
     return response.json()
 
 
-def free_ip_api_key_picker(js):
+def api_key_picker(js):
     result = {}
     our_keys = {
         "ipAddress",
