@@ -15,7 +15,7 @@ LIST_SIZE   ?= 5
 .PHONY: help venv build up down restart ps logs logs-c wait unit stress providers clusters verify clean
 
 help:
-	@echo "make venv      - create .venv from requirements.txt + pytest, pytest-asyncio"
+	@echo "make venv      - create .venv from requirements-dev.txt"
 	@echo "make build     - build the three docker images"
 	@echo "make up        - build, start detached, wait until all services answer"
 	@echo "make down      - stop and remove the containers and network"
@@ -33,7 +33,7 @@ venv: .venv/bin/python
 .venv/bin/python:
 	python3 -m venv .venv
 	.venv/bin/pip install --quiet --upgrade pip
-	.venv/bin/pip install --quiet -r requirements.txt pytest pytest-asyncio
+	.venv/bin/pip install --quiet -r requirements-dev.txt
 
 build:
 	$(COMPOSE) build
