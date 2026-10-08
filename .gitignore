@@ -13,6 +13,3 @@ venv/
 
 # course material
 task.md
-
-# local tests
-tests/
