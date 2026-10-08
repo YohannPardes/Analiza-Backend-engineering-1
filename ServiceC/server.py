@@ -1,5 +1,9 @@
+import logging
 from fastapi import FastAPI, HTTPException
 import connector, API_manager
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 api_manager = API_manager.APIManager()
@@ -9,14 +13,14 @@ BASE_URL = "http://svc-b-cont:8080"
 
 @app.get("/")
 async def get_data():
-    print(f"START: Get Data")
+    logger.info("START: Get Data")
     return await connector.make_request(
         BASE_URL + "/getAll", 5, "ServiceB-GetAll"
     )
 
 @app.get("/resolve-ip/{ip}")
 async def resolve_ip(ip: str):
-    print(f"START: Add IP {ip}")
+    logger.info(f"START: Add IP {ip}")
     ip = connector.validate_ip(ip)
 
     # Get geo information from the API manager

@@ -1,5 +1,5 @@
 import math
-from statistics import mean, median
+from statistics import mean, median, quantiles
 
 EARTH_RADIUS_KM = 6371.0
 
@@ -12,17 +12,47 @@ def haversine_km(lat1, lon1, lat2, lon2):
     return 2 * EARTH_RADIUS_KM * math.asin(math.sqrt(a))
 
 
-def _neighbors(records, max_km):
-    """Adjacency list: record id -> ids within max_km of it."""
+def _distance(records, a, b):
+    ra, rb = records[a], records[b]
+    return haversine_km(ra["latitude"], ra["longitude"], rb["latitude"], rb["longitude"])
+
+
+def _spanning_tree(records):
+    """Minimum spanning tree (Prim's algorithm): list of (length_km, id_a, id_b) edges."""
     ids = list(records)
-    graph = {rid: [] for rid in ids}
-    for i, a in enumerate(ids):
-        for b in ids[i + 1:]:
-            ra, rb = records[a], records[b]
-            if haversine_km(ra["latitude"], ra["longitude"],
-                            rb["latitude"], rb["longitude"]) <= max_km:
-                graph[a].append(b)
-                graph[b].append(a)
+    if not ids:
+        return []
+    closest = {rid: (_distance(records, ids[0], rid), ids[0]) for rid in ids[1:]}   # id -> (distance, tree node)
+    edges = []
+    while closest:
+        rid = min(closest, key=lambda r: closest[r][0])
+        length, parent = closest.pop(rid)
+        edges.append((length, parent, rid))
+        for other, (best, _) in closest.items():
+            d = _distance(records, rid, other)
+            if d < best:
+                closest[other] = (d, rid)
+    return edges
+
+
+def _cut_length(lengths):
+    """Tukey's outlier fence (Q3 + 1.5 * IQR) over the tree's edge lengths."""
+    lengths = [l for l in lengths if l > 0]     # identical coordinates carry no distance scale
+    if len(lengths) < 2:
+        return math.inf
+    q1, _, q3 = quantiles(lengths, n=4, method="inclusive")
+    return q3 + 1.5 * (q3 - q1)
+
+
+def _neighbors(records):
+    """Adjacency list of the spanning tree without its unusually long edges."""
+    edges = _spanning_tree(records)
+    cut = _cut_length([length for length, _, _ in edges])
+    graph = {rid: [] for rid in records}
+    for length, a, b in edges:
+        if length <= cut:
+            graph[a].append(b)
+            graph[b].append(a)
     return graph
 
 
@@ -45,8 +75,12 @@ def _components(graph):
     return groups
 
 
-def cluster(records, max_km=200):
+def cluster(records):
     """
+    Zahn's MST clustering: link all points with a minimum spanning tree, drop the edges that
+    are outliers among its lengths, and return the connected groups that remain.
+    No distance parameter: the cut-off comes from the data itself.
+
     records: {record_id: {"latitude": .., "longitude": .., ...}}
     returns: {cluster_id: {median_coordinates, mean_coordinates, record_id: record, ...}}
     """
@@ -54,7 +88,7 @@ def cluster(records, max_km=200):
                if r.get("latitude") is not None and r.get("longitude") is not None}
 
     result = {}
-    for n, group in enumerate(_components(_neighbors(records, max_km)), start=1):
+    for n, group in enumerate(_components(_neighbors(records)), start=1):
         lons = [records[rid]["longitude"] for rid in group]
         lats = [records[rid]["latitude"] for rid in group]
         entry = {
@@ -77,6 +111,6 @@ def cluster(records, max_km=200):
 #         "4": {"latitude": 29.7604, "longitude": -95.3698},  # Houston
 #         "5": {"latitude": 33.4484, "longitude": -112.0740},  # Phoenix
 #     }
-#     clusters = cluster(example_records, max_km=2000)
+#     clusters = cluster(example_records)
 #     print(clusters)
     

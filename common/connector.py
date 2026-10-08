@@ -1,6 +1,9 @@
+import logging
 import httpx
 from pydantic import BaseModel, IPvAnyAddress
 from fastapi import HTTPException
+
+logger = logging.getLogger(__name__)
 
 class ValidIpDTO(BaseModel):
     ip: IPvAnyAddress
@@ -11,7 +14,7 @@ def validate_ip(ip: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    print("validation passed: ", validated.ip)
+    logger.info(f"validation passed: {validated.ip}")
     return validated.ip
 
 

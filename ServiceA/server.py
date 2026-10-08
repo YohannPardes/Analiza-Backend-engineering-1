@@ -1,6 +1,10 @@
+import logging
 from fastapi import FastAPI, HTTPException
 import connector
 import uvicorn
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 BASE_URL_B = "http://svc-b-cont:8080"
@@ -8,7 +12,7 @@ BASE_URL_C = "http://svc-c-cont:8080"
 
 @app.get("/")
 async def get_data():
-    print(f"START: Get Data")
+    logger.info("START: Get Data")
     return await connector.make_request(
         BASE_URL_B + "/getAll", 2, "ServiceB-GetAll"
     )
@@ -27,7 +31,7 @@ async def resolve_ip_list(ips: list[str]):
             message = e.detail
 
         if message is not None:
-            print(f"Error resolving IP {ip}: {message}")
+            logger.warning(f"Error resolving IP {ip}: {message}")
             return_dict["success"] = False
             return_dict["failed_ip_count"] += 1
             return_dict["failed_ips"].append((ip, message))
@@ -36,13 +40,13 @@ async def resolve_ip_list(ips: list[str]):
 
 @app.get("/favicon.ico")
 def favicon():
-    print(f"START: favicon")
+    logger.info("START: favicon")
     return "ok"
 
 
 @app.get("/delete/{iid}")
 async def delete(iid):
-    print(f"START: delete {iid}")
+    logger.info(f"START: delete {iid}")
     return await connector.make_request(
         BASE_URL_B + f"/delete/{iid}", 2, "ServiceB-Delete", method='DELETE'
     )

@@ -1,13 +1,17 @@
-from fastapi import FastAPI, HTTPException, Query
+import logging
+from fastapi import FastAPI, HTTPException
 #import uvicorn
 from memory import IpMemory
 import geo_cluster
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
 @app.get("/getAll")
 async def get_data():
-    print(f"START: Get Data. Length: {await IpMemory.acquire_the_lock(IpMemory.length_of_data)}")
+    logger.info(f"START: Get Data. Length: {await IpMemory.acquire_the_lock(IpMemory.length_of_data)}")
     return await IpMemory.acquire_the_lock(IpMemory.get_data)
 
 @app.get("/getAllIPs")
@@ -16,7 +20,7 @@ async def get_all_ips():
 
 @app.post("/AddIp")
 async def add_ip(request_data: dict):
-    print("START: Add IP")
+    logger.info("START: Add IP")
     missing = [k for k in ("ipAddress", "latitude", "longitude") if request_data.get(k) is None]
     if missing:
         raise HTTPException(status_code=400, detail=f"missing fields: {missing}")
@@ -28,7 +32,7 @@ async def add_ip(request_data: dict):
 
 @app.delete("/delete/{iid}")
 async def delete(iid):
-    print(f"START: delete {iid}")
+    logger.info(f"START: delete {iid}")
     if not await IpMemory.acquire_the_lock(IpMemory.delete_if_exists, iid):
         return {"success": False, "message": "IP address does not exists"}
 
@@ -38,10 +42,10 @@ async def delete(iid):
     }
 
 @app.get("/generate-geo-clusters")
-async def generate_geo_clusters(max_km: float = Query(300, gt=0)):
-    print(f"START: generate geo clusters (max_km={max_km})")
+async def generate_geo_clusters():
+    logger.info("START: generate geo clusters")
     data = await IpMemory.acquire_the_lock(IpMemory.get_data)
-    return geo_cluster.cluster(data, max_km=max_km)
+    return geo_cluster.cluster(data)
 
 #if __name__ == "__main__":
     #uvicorn.run("server:app", host="0.0.0.0", port=8082, workers=1)

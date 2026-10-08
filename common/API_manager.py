@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from connector import validate_ip
-import httpx, time
+import httpx, logging, time
+
+logger = logging.getLogger(__name__)
 
 
 class ProviderUnavailable(Exception):
@@ -181,7 +183,7 @@ class GeoAPIProvider2(GeoAPI):
         X_Rl = response.headers.get('X-Rl')
         X_Ttl = response.headers.get('X-Ttl')
 
-        print(f"X-Rl: {X_Rl}, X-Ttl: {X_Ttl}")
+        logger.info(f"X-Rl: {X_Rl}, X-Ttl: {X_Ttl}")
 
         if X_Rl is not None and X_Ttl is not None and int(X_Rl) == 0:
             self.blocked_until = time.time() + int(X_Ttl)
@@ -211,7 +213,7 @@ class APIManager:
             try:
                 return await api.get_geo_infos(ip)
             except ProviderUnavailable as e:    # InvalidIPError propagates: another provider won't help
-                print(f"Error with {api.__class__.__name__}: {e}")
+                logger.warning(f"Error with {api.__class__.__name__}: {e}")
                 errors.append(str(e))
 
         raise ProviderUnavailable(f"All geo providers unavailable: {errors}")
