@@ -223,6 +223,7 @@ class APIManager:
 
 # minimal compilation testing
 if __name__ == "__main__":
+    import asyncio
 
     provider1 = GeoAPIProvider1()
     provider2 = GeoAPIProvider2()
