@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from connector import validate_ip
 import httpx, logging, time
 
 logger = logging.getLogger(__name__)
@@ -189,7 +188,6 @@ class GeoAPIProvider2(GeoAPI):
             self.blocked_until = time.time() + int(X_Ttl)
 
 
-
 class APIManager:
     """
     Manages multiple API clients and handles request distribution based on their limits.
@@ -219,10 +217,9 @@ class APIManager:
         raise ProviderUnavailable(f"All geo providers unavailable: {errors}")
 
 
-
-
 # minimal compilation testing
 if __name__ == "__main__":
+    import asyncio
 
     provider1 = GeoAPIProvider1()
     provider2 = GeoAPIProvider2()

@@ -15,7 +15,7 @@ BASE_URL = "http://svc-b-cont:8080"
 async def get_data():
     logger.info("START: Get Data")
     return await connector.make_request(
-        BASE_URL + "/getAll", 5, "ServiceB-GetAll"
+        BASE_URL + "/ips", 5, "ServiceB-GetAll"
     )
 
 @app.get("/resolve-ip/{ip}")
@@ -33,6 +33,6 @@ async def resolve_ip(ip: str):
 
     # Adding the ip in Services B DB
     return await connector.make_request(
-        BASE_URL + "/AddIp", 8, "ServiceB-AddIp", method='POST',
+        BASE_URL + "/ips", 8, "ServiceB-AddIp", method='POST',
         json_data=response_dict
     )

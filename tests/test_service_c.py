@@ -38,14 +38,14 @@ def geo_lookup(service_c, monkeypatch, result=RECORD, error=None):
 
 def test_get_all_is_forwarded_to_service_b(client, service_b_calls):
     client.get("/")
-    assert service_b_calls == [("GET", "http://svc-b-cont:8080/getAll", None)]
+    assert service_b_calls == [("GET", "http://svc-b-cont:8080/ips", None)]
 
 
 def test_resolved_ip_is_stored_in_service_b(client, service_c, monkeypatch, service_b_calls):
     geo_lookup(service_c, monkeypatch)
 
     assert client.get("/resolve-ip/24.48.0.1").json() == {"success": True}
-    assert service_b_calls == [("POST", "http://svc-b-cont:8080/AddIp", RECORD)]
+    assert service_b_calls == [("POST", "http://svc-b-cont:8080/ips", RECORD)]
 
 
 def test_malformed_ip_is_a_400(client, service_c, monkeypatch, service_b_calls):

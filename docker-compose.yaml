@@ -1,3 +1,8 @@
+x-kafka-env: &kafka-env                    # defined once; "&kafka-env" names it
+  KAFKA_BOOTSTRAP_SERVERS: kafka-broker:9092
+  KAFKA_TOPIC: user-gateway
+
+
 services:
 
   service-a-container:
@@ -5,18 +10,21 @@ services:
       context: .
       dockerfile: ./ServiceA/Dockerfile
     container_name: svc-a-cont
-    networks:
-      - my-network
+    depends_on: 
+      kafka-init:
+        condition: service_completed_successfully
+
     ports:
       - "8081:8080"
+    environment:
+      <<: *kafka-env
+    restart: on-failure
 
   service-b-container:
     build:
       context: .
       dockerfile: ./ServiceB/Dockerfile
     container_name: svc-b-cont
-    networks:
-      - my-network
     ports:
       - "8082:8080"
 
@@ -25,11 +33,60 @@ services:
       context: .
       dockerfile: ./ServiceC/Dockerfile
     container_name: svc-c-cont
-    networks:
-      - my-network
     ports:
       - "8083:8080"
 
-networks:
-  my-network:
-    driver: bridge
+  kafka-broker:
+    image: apache/kafka:4.3.1
+    hostname: kafka-broker
+    environment:
+      KAFKA_NODE_ID: 1                                                          # unique id of this node
+      KAFKA_PROCESS_ROLES: broker,controller                                    # one node does both: stores events + manages the cluster (no ZooKeeper)
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093                     # ports opened: 9092 clients, 9093 controller traffic
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker:9092                 # address given to clients (default localhost is unreachable from other containers)
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER                               # which listener is the controller one
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT  # both listeners are plain, unencrypted
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-broker:9093                       # controller quorum: just this node (id@host:port)
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1                                 # default 3 needs 3 brokers; consumer groups fail without it
+      KAFKA_LOG_DIRS: /var/lib/kafka/data                                       # store events in the kafka-data volume (default is /tmp)
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:                                                                # kafka-init waits until this succeeds
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]  # succeeds only once Kafka answers
+      interval: 5s                                                              # run the check every 5 s
+      timeout: 10s                                                              # the CLI starts a JVM, so give it time
+      retries: 10                                                               # unhealthy after 10 failures in a row
+      start_period: 10s                                                         # failures during startup don't count
+
+  kafka-init:
+    image: apache/kafka:4.3.1
+    depends_on:
+      kafka-broker:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        /opt/kafka/bin/kafka-topics.sh
+        --bootstrap-server kafka-broker:9092
+        --create
+        --if-not-exists
+        --topic user-gateway
+        --partitions 1
+        --replication-factor 1
+    restart: "no"
+
+  kafka-consumer:
+    build:
+      context: .                  # project root, so the Dockerfile can copy common/ (connector.py)
+      dockerfile: ./kafka-consumer/Dockerfile
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+
+    environment:
+      <<: *kafka-env
+      KAFKA_GROUP_ID: user-gateway-group
+    restart: unless-stopped
+
+volumes:
+  kafka-data:

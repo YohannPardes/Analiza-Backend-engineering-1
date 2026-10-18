@@ -6,7 +6,7 @@ from fastapi import HTTPException
 
 import connector
 
-URL = "http://svc-b-cont:8080/getAll"
+URL = "http://svc-b-cont:8080/ips"
 
 
 @pytest.fixture

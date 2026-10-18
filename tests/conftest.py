@@ -7,10 +7,11 @@ import pytest
 ROOT = Path(__file__).parent.parent
 
 # the containers copy these files flat into /app, so mirror that import layout
-for folder in ("common", "ServiceB"):
+for folder in ("common", "ServiceA", "ServiceB"):
     sys.path.insert(0, str(ROOT / folder))
 
-from memory import IpMemory
+import kafka
+from memory import IpMemory, UserMemory
 
 
 def load_server(service):
@@ -36,11 +37,32 @@ def service_c():
     return load_server("ServiceC")
 
 
+@pytest.fixture(scope="session")
+def consumer():
+    """Import kafka-consumer/process.py without Kafka.
+
+    The module creates its KafkaConsumer and runs its loop at import time, so the import
+    gets an empty fake consumer: the loop ends at once and handle() is left to test.
+    """
+    patch = pytest.MonkeyPatch()
+    for name, value in {"KAFKA_TOPIC": "user-gateway", "KAFKA_BOOTSTRAP_SERVERS": "kafka-broker:9092",
+                        "KAFKA_GROUP_ID": "user-gateway-group"}.items():
+        patch.setenv(name, value)
+    patch.setattr(kafka, "KafkaConsumer", lambda *args, **kwargs: iter(()))
+    spec = importlib.util.spec_from_file_location("kafka_consumer_process", ROOT / "kafka-consumer" / "process.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    patch.undo()
+    return module
+
+
 @pytest.fixture
 def clean_memory():
-    """IpMemory keeps its state on the class, so empty it around every test."""
+    """IpMemory and UserMemory keep their state on the class, so empty them around every test."""
     IpMemory.data.clear()
     IpMemory.used_ips.clear()
+    UserMemory.users.clear()
     yield
     IpMemory.data.clear()
     IpMemory.used_ips.clear()
+    UserMemory.users.clear()

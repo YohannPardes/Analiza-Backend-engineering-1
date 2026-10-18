@@ -1,16 +1,23 @@
 from uuid import uuid4
 import asyncio
+from contracts import SignInRequest
 
-class IpMemory:
-    data = {} # {euwewuy: geoData1, eriuwyv: geoData2}
-    used_ips = set() # {10.10.0.4, 1.1.2.2, 30.40.50.60}
-    mem_lock = asyncio.Lock()
+class Memory():
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls.mem_lock = asyncio.Lock()
 
     @classmethod
     async def acquire_the_lock(cls, func, *args):
         async with cls.mem_lock:
             value = await func(*args)
         return value
+
+
+class IpMemory(Memory):
+    data = {} # {euwewuy: geoData1, eriuwyv: geoData2}
+    used_ips = set() # {10.10.0.4, 1.1.2.2, 30.40.50.60}
 
     @classmethod
     async def get_all_ips(cls):
@@ -51,3 +58,16 @@ class IpMemory:
             return False
         cls.used_ips.discard(record["ipAddress"])
         return True
+
+class UserMemory(Memory):
+    users = {}  # TODO: type hint, e.g. users: dict[str, SignInRequest] = {}
+
+    @classmethod
+    async def add_if_new(cls, request_data : SignInRequest):
+        """adds the record unless its email is already stored"""
+        if request_data.email in cls.users.keys():
+            return {"success": True, "added" : False, "message": "User already exists"}
+
+        cls.users[request_data.email] = request_data
+        return {"success": True, "added": True, "message": "User added successfully"}    
+        

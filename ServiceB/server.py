@@ -1,24 +1,25 @@
 import logging
 from fastapi import FastAPI, HTTPException
-#import uvicorn
-from memory import IpMemory
+import uvicorn
+from memory import IpMemory, UserMemory
 import geo_cluster
+from contracts import SignInRequest
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-@app.get("/getAll")
+@app.get("/ips")
 async def get_data():
     logger.info(f"START: Get Data. Length: {await IpMemory.acquire_the_lock(IpMemory.length_of_data)}")
     return await IpMemory.acquire_the_lock(IpMemory.get_data)
 
-@app.get("/getAllIPs")
+@app.get("/ips/addresses")
 async def get_all_ips():
     return await IpMemory.acquire_the_lock(IpMemory.get_all_ips)
 
-@app.post("/AddIp")
+@app.post("/ips")
 async def add_ip(request_data: dict):
     logger.info("START: Add IP")
     missing = [k for k in ("ipAddress", "latitude", "longitude") if request_data.get(k) is None]
@@ -30,7 +31,7 @@ async def add_ip(request_data: dict):
 
     return {"success": True, "new_id": new_id, "data_length": await IpMemory.acquire_the_lock(IpMemory.length_of_data)}
 
-@app.delete("/delete/{iid}")
+@app.delete("/ips/{iid}")
 async def delete(iid):
     logger.info(f"START: delete {iid}")
     if not await IpMemory.acquire_the_lock(IpMemory.delete_if_exists, iid):
@@ -41,11 +42,25 @@ async def delete(iid):
         "data_length": await IpMemory.acquire_the_lock(IpMemory.length_of_data)
     }
 
-@app.get("/generate-geo-clusters")
+@app.get("/clusters")
 async def generate_geo_clusters():
     logger.info("START: generate geo clusters")
     data = await IpMemory.acquire_the_lock(IpMemory.get_data)
     return geo_cluster.cluster(data)
 
-#if __name__ == "__main__":
-    #uvicorn.run("server:app", host="0.0.0.0", port=8082, workers=1)
+@app.post("/users")
+async def add_user(request_data: SignInRequest):
+    logger.info("START: Add User")
+
+    output = await UserMemory.acquire_the_lock(UserMemory.add_if_new, request_data)
+    if not output["success"]:
+        raise HTTPException(status_code=400, detail=output["message"])
+    if not output.get("added"):
+        return {"success": True, "message": "User already exists"}
+
+    return {"success": True, "message": "User added successfully"}
+
+
+if __name__ == "__main__":
+    uvicorn.run("server:app", host="0.0.0.0", port=8082, workers=1)
+    

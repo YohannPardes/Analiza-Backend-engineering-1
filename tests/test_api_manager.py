@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 
@@ -124,6 +125,24 @@ async def test_blocks_once_the_request_limit_is_reached():
     assert not api.is_available()
     with pytest.raises(ProviderUnavailable):
         await api.get_geo_infos(IP)
+
+
+async def test_concurrent_requests_cannot_exceed_the_limit():
+    """The slot is reserved before the first await, so overlapping requests can't over-book."""
+    api, sent = freeipapi(), 0
+    canned = api.get
+
+    async def slow_get(url, timeout):
+        nonlocal sent
+        sent += 1
+        await asyncio.sleep(0.05)                       # every request is suspended here together
+        return await canned(url, timeout)
+    api.get = slow_get
+
+    results = await asyncio.gather(*(api.get_geo_infos(IP) for _ in range(50)), return_exceptions=True)
+
+    assert sent == 10
+    assert sum(isinstance(r, ProviderUnavailable) for r in results) == 40
 
 
 async def test_failed_requests_count_against_the_limit():
